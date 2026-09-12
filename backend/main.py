@@ -1,63 +1,137 @@
 from fastapi import FastAPI
+from backend.model_loader import model
+from backend.schemas import RiskInput
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import logging
+from backend.hotspots import hotspots
 
-from backend.config import settings
-from backend.database import engine, Base
-from backend.routers import incidents
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan events"""
-    # Startup
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Application startup complete")
-    yield
-    # Shutdown
-    logger.info("Application shutdown")
 
 
 app = FastAPI(
-    title="Road Safety Management Platform",
-    description="Analytical platform for city-level road safety management",
-    version="1.0.0",
-    lifespan=lifespan
+    title="SafetyROI",
+    description="Road Risk Prediction API",
+    version="1.0"
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(incidents.router, prefix="/api/v1", tags=["incidents"])
-
-
 @app.get("/")
-async def root():
-    """Root endpoint"""
+def home():
     return {
-        "message": "Road Safety Management Platform API",
-        "version": "1.0.0",
-        "status": "operational"
+        "message": "SafetyROI API Running"
     }
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
+
+@app.post("/predict")
+def predict(data: RiskInput):
+
+    values = [[
+        CITY_MAP[data.city],
+        data.hour,
+        DAY_MAP[data.day_of_week],
+        data.is_weekend,
+        ROAD_MAP[data.road_type],
+        data.lanes,
+        data.traffic_signal,
+        WEATHER_MAP[data.weather],
+        data.visibility,
+        data.temperature,
+        TRAFFIC_MAP[data.traffic_density],
+        data.vehicles_involved,
+        data.is_peak_hour
+    ]]
+
+    risk = float(model.predict(values)[0])
+
+    if risk < 0.4:
+        level = "Low"
+    elif risk < 0.7:
+        level = "Medium"
+    else:
+        level = "High"
+    recommendations = []
+
+    if data.weather == "rain":
+        recommendations.append(
+            "Reduce speed and maintain safe braking distance."
+        )
+
+    if data.visibility < 5:
+        recommendations.append(
+            "Use headlights and stay alert in low visibility."
+        )
+
+    if data.traffic_density == "high":
+        recommendations.append(
+            "Avoid sudden lane changes in dense traffic."
+        )
+
+    if data.is_peak_hour == 1:
+        recommendations.append(
+            "Expect congestion and allow extra travel time."
+        )
+
+    if level == "High":
+        recommendations.append(
+            "Consider postponing travel or choosing an alternate route."
+        )
+
+    if len(recommendations) == 0:
+        recommendations.append(
+            "Road conditions appear relatively safe."
+        )
+
+    explanation = []
+
+    if data.weather == "rain":
+        explanation.append("rainy weather")
+
+    if data.visibility < 5:
+        explanation.append(f"low visibility ({data.visibility} km)")
+
+    if data.traffic_density == "high":
+        explanation.append("high traffic density")
+
+    if data.is_peak_hour == 1:
+        explanation.append("peak-hour traffic")
+
+    if explanation:
+        explanation_text = (
+            f"This route has a {level.lower()} accident risk because "
+            + ", ".join(explanation)
+            + " are significant factors that increase the likelihood of road incidents."
+        )
+    else:
+        explanation_text = (
+            "Current conditions indicate relatively safe travel."
+        )
+
+    return {
+    "risk_score": round(risk, 3),
+    "risk_level": level,
+    "recommendations": recommendations,
+    "explanation": explanation_text,
+    "risk_factors": {
+        "Visibility": "30.4%",
+        "Traffic Density": "28.2%",
+        "Weather": "23.1%",
+        "Peak Hour": "8.0%"
+    }
+}
+
+from backend.encoders import (
+    CITY_MAP,
+    DAY_MAP,
+    ROAD_MAP,
+    WEATHER_MAP,
+    TRAFFIC_MAP
+)
+@app.get("/hotspots")
+def get_hotspots():
+    return hotspots
