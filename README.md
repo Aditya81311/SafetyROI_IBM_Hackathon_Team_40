@@ -43,21 +43,6 @@ The project combines Machine Learning, FastAPI, React, and Geospatial Visualizat
 - Machine Learning model with R² score of 0.88
 - Cloud deployment using Vercel and Render
 
-## Live Demo
-
-### Frontend Application
-
-🔗 https://road-shield-ai.vercel.app
-
-### Backend API
-
-🔗 https://roadshield-ai.onrender.com
-
-### API Documentation
-
-🔗 https://roadshield-ai.onrender.com/docs
-
----
 
 ## Features
 
