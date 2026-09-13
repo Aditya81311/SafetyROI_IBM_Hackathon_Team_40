@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from backend.model_loader import model
-from backend.schemas import RiskInput
+from model_loader import model
+from schemas import RiskInput
 from fastapi.middleware.cors import CORSMiddleware
-from backend.hotspots import hotspots
+from hotspots import hotspots
 
 
 
@@ -125,7 +125,7 @@ def predict(data: RiskInput):
     }
 }
 
-from backend.encoders import (
+from encoders import (
     CITY_MAP,
     DAY_MAP,
     ROAD_MAP,
